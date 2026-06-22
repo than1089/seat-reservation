@@ -63,9 +63,15 @@ export function SeatsPage() {
 
       <div className="seat-grid">
         {seatsQuery.data?.map((seat) => {
-          const disabled =
-            seat.status === 'RESERVED' ||
-            (seat.status === 'HELD' && !seat.isHeldByCurrentUser);
+          const heldBySomeoneElse =
+            seat.status === 'HELD' && !seat.isHeldByCurrentUser;
+          const canSelect =
+            seat.status !== 'RESERVED' &&
+            !heldBySomeoneElse &&
+            !seat.isHeldByCurrentUser;
+
+          const isHoldingThisSeat =
+            holdMutation.isPending && holdMutation.variables === seat.id;
 
           return (
             <article key={seat.id} className={`seat-card ${seat.status.toLowerCase()}`}>
@@ -76,13 +82,13 @@ export function SeatsPage() {
                   Continue checkout
                 </Link>
               )}
-              {!disabled && !seat.isHeldByCurrentUser && (
+              {canSelect && (
                 <button
                   className="btn primary"
                   disabled={holdMutation.isPending}
                   onClick={() => holdMutation.mutate(seat.id)}
                 >
-                  {holdMutation.isPending ? 'Holding...' : 'Select seat'}
+                  {isHoldingThisSeat ? 'Holding...' : 'Select seat'}
                 </button>
               )}
               {holdMutation.error && holdMutation.variables === seat.id && (

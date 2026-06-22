@@ -13,7 +13,11 @@ export function ConfirmationPage() {
 
   const reservation = reservationsQuery.data?.find((r) => r.id === reservationId);
 
-  if (reservationsQuery.isLoading) {
+  const isResolving =
+    reservationsQuery.isPending ||
+    (reservationsQuery.isFetching && !reservation);
+
+  if (isResolving) {
     return <p>Loading confirmation...</p>;
   }
 

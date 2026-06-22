@@ -68,15 +68,15 @@ export function CheckoutPage() {
     mutationFn: (id: string) =>
       request<Payment>(`/payments/${id}/confirm`, { method: 'POST' }),
     onSuccess: async (payment) => {
-      await queryClient.invalidateQueries({ queryKey: ['reservations'] });
-
       if (payment.reservationId) {
+        await queryClient.refetchQueries({ queryKey: ['reservations'] });
         navigate(`/confirmation/${payment.reservationId}`);
         return;
       }
 
       const polled = await pollPayment(payment.id);
       if (polled.reservationId) {
+        await queryClient.refetchQueries({ queryKey: ['reservations'] });
         navigate(`/confirmation/${polled.reservationId}`);
       }
     },
