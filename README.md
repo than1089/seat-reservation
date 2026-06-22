@@ -15,7 +15,8 @@ A simple public seat reservation app where authenticated users can reserve one o
 ```
 Browser → Clerk (sign-in) → React app
 React app → Nest API (Bearer JWT) → PostgreSQL
-Mock payment → POST /webhooks/payments → atomic reservation commit
+Mock checkout → POST /payments/:id/confirm (dev UX) ─┐
+Provider webhook → POST /webhooks/payments ────────────┴→ atomic reservation commit
 ```
 
 ### Data model (ERD)
@@ -149,6 +150,35 @@ GET    /payments/:id
 POST   /payments/:id/confirm    (dev mock)
 POST   /webhooks/payments       (X-Webhook-Secret header)
 GET    /reservations/me
+```
+
+### Completing a payment (two paths)
+
+Both endpoints call the same `completePayment` logic: lock the seat row, mark the payment `COMPLETED`, set the seat to `RESERVED`, and create a `Reservation`. Duplicate calls for an already-finished payment return idempotently without creating a second reservation.
+
+**1. `POST /payments/:id/confirm` — local demo / happy-path UX**
+
+- **Who calls it:** the signed-in user’s browser (checkout **Pay … (mock)** button).
+- **Auth:** Clerk Bearer JWT; must be the payment owner.
+- **When:** right after `POST /payments` creates a `PENDING` payment while the user still holds the seat.
+- **Why it exists:** simulates instant checkout without integrating Stripe. The UI gets an immediate confirmation redirect.
+- **Production note:** with real Stripe you would **not** expose this to the client; payment success must come from a verified provider event, not a user-triggered API call.
+
+**2. `POST /webhooks/payments` — async provider callback (Stripe-shaped)**
+
+- **Who calls it:** a server (here, manual `curl` or e2e tests; in production, Stripe after `payment_intent.succeeded`).
+- **Auth:** `X-Webhook-Secret` header (public route — no Clerk token).
+- **When:** after the provider decides the charge succeeded or failed (may arrive seconds later, or more than once on retry).
+- **Why it exists:** mirrors real async payment confirmation and **idempotent webhook delivery** (second POST with the same `paymentId` is a no-op).
+- **Body:** `{ "paymentId": "<uuid>", "success": true }` — set `success: false` to simulate a failed charge and release the hold.
+
+Example (after creating a payment):
+
+```bash
+curl -X POST http://localhost:3000/webhooks/payments \
+  -H 'Content-Type: application/json' \
+  -H 'X-Webhook-Secret: dev-webhook-secret-change-me' \
+  -d '{"paymentId":"<payment-uuid>","success":true}'
 ```
 
 ## Tests
