@@ -107,7 +107,9 @@ export class PaymentsService {
 
   // Shared by mock confirm and payment webhooks. Commits payment + seat + reservation atomically.
   private async completePayment(paymentId: string, success: boolean) {
-    return this.prisma.$transaction(async (tx) => {
+    let holdInvalid = false;
+
+    const result = await this.prisma.$transaction(async (tx) => {
       const payment = await tx.payment.findUnique({
         where: { id: paymentId },
       });
@@ -181,17 +183,22 @@ export class PaymentsService {
       }
 
       // Hold must still belong to this payer; otherwise the payment cannot succeed.
-      if (
-        seat.status === SeatStatus.RESERVED ||
-        (seat.status === SeatStatus.HELD &&
-          (seat.heldByUserId !== payment.userId ||
-            isHoldExpired(seat.holdExpiresAt)))
-      ) {
+      const holdValid =
+        seat.status === SeatStatus.HELD &&
+        seat.heldByUserId === payment.userId &&
+        !isHoldExpired(seat.holdExpiresAt);
+
+      if (seat.status === SeatStatus.RESERVED || !holdValid) {
         await tx.payment.update({
           where: { id: paymentId },
           data: { status: PaymentStatus.FAILED },
         });
-        throw new GoneException('Seat hold expired or invalid');
+        holdInvalid = true;
+        return {
+          id: payment.id,
+          status: PaymentStatus.FAILED,
+          reservationId: null,
+        };
       }
 
       // Happy path: mark paid, reserve seat, and create the reservation in one commit.
@@ -224,6 +231,12 @@ export class PaymentsService {
         reservationId: reservation.id,
       };
     });
+
+    if (holdInvalid) {
+      throw new GoneException('Seat hold expired or invalid');
+    }
+
+    return result;
   }
 
   private async toPaymentResponse(paymentId: string) {

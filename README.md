@@ -190,13 +190,17 @@ Requires Postgres running (e.g. `docker compose up postgres -d`) with migrations
 npm run test --workspace=apps/api
 
 # E2E (uses E2E_TEST_MODE with test Bearer tokens)
-E2E_TEST_MODE=true npm run test:e2e --workspace=apps/api
+npm run test:e2e
 ```
 
 E2E covers:
 - Happy path: hold → pay → confirm → reservation
-- 30 parallel hold attempts → exactly 1 success
+- Concurrent hold attempts → exactly 1 success
 - Duplicate webhook idempotency
+- Abandoned checkout (expired hold frees the seat)
+- Failed payment webhook (releases hold, no reservation)
+- Delayed successful webhook (completes while hold is valid)
+- Delayed webhook after hold expired (`410`, payment `FAILED`)
 
 ## Trade-offs
 
@@ -212,3 +216,8 @@ E2E covers:
 - Mock payment only (no Stripe)
 - No refunds or seat transfers
 - Requires a Clerk dev account for sign-in
+- **Late payment after hold expiry:** If a provider webhook reports success after the 10-minute hold has expired (or the seat was released), the API returns **410 Gone**, marks the payment `FAILED`, and does **not** create a reservation. That protects inventory — the seat may already belong to someone else. In this demo there is no real charge, so nothing is refunded. See [Future improvements](#future-improvements).
+
+## Future improvements
+
+- **Refunds for late-captured payments:** With a real gateway (e.g. Stripe), a delayed `payment_intent.succeeded` webhook could arrive after the hold is gone. The correct production flow is: reject the reservation (as today), then **automatically refund** the capture via the provider API and notify the user to pick another seat or try again. E2E test `delayed successful webhook fails when the hold has expired` documents the reservation side; refund would be a separate idempotent handler keyed on `paymentId` / Stripe event ID.

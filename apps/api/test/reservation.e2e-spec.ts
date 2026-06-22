@@ -6,7 +6,8 @@ import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
-import { SeatStatus } from '../src/generated/prisma/enums';
+import { SeatsService } from '../src/seats/seats.service';
+import { PaymentStatus, SeatStatus } from '../src/generated/prisma/enums';
 
 describe('Reservation flow (e2e)', () => {
   let app: INestApplication<App>;
@@ -61,6 +62,14 @@ describe('Reservation flow (e2e)', () => {
   afterAll(async () => {
     await app.close();
   });
+
+  async function expireHold(seatId: string) {
+    await prisma.seat.update({
+      where: { id: seatId },
+      data: { holdExpiresAt: new Date(Date.now() - 60_000) },
+    });
+    await app.get(SeatsService).releaseExpiredHolds();
+  }
 
   it('completes happy path: hold -> pay -> confirm -> reservation', async () => {
     const seatsRes = await request(app.getHttpServer())
@@ -159,5 +168,171 @@ describe('Reservation flow (e2e)', () => {
       where: { paymentId },
     });
     expect(reservations).toHaveLength(1);
+  });
+
+  it('frees the seat after abandoned checkout when the hold expires', async () => {
+    const seatsRes = await request(app.getHttpServer())
+      .get('/seats')
+      .set('Authorization', userA)
+      .expect(200);
+
+    const seatId = seatsRes.body[0].id;
+
+    await request(app.getHttpServer())
+      .post(`/seats/${seatId}/hold`)
+      .set('Authorization', userA)
+      .expect(201);
+
+    await request(app.getHttpServer())
+      .post('/payments')
+      .set('Authorization', userA)
+      .set('Idempotency-Key', 'abandon-key')
+      .send({ seatId })
+      .expect(201);
+
+    await expireHold(seatId);
+
+    const seatAfterAbandon = await prisma.seat.findUniqueOrThrow({
+      where: { id: seatId },
+    });
+    expect(seatAfterAbandon.status).toBe(SeatStatus.AVAILABLE);
+    expect(seatAfterAbandon.heldByUserId).toBeNull();
+
+    await request(app.getHttpServer())
+      .post(`/seats/${seatId}/hold`)
+      .set('Authorization', userB)
+      .expect(201);
+  });
+
+  it('failed payment webhook marks payment failed and releases the hold', async () => {
+    const seatsRes = await request(app.getHttpServer())
+      .get('/seats')
+      .set('Authorization', userA)
+      .expect(200);
+
+    const seatId = seatsRes.body[0].id;
+
+    await request(app.getHttpServer())
+      .post(`/seats/${seatId}/hold`)
+      .set('Authorization', userA)
+      .expect(201);
+
+    const paymentRes = await request(app.getHttpServer())
+      .post('/payments')
+      .set('Authorization', userA)
+      .set('Idempotency-Key', 'failed-webhook-key')
+      .send({ seatId })
+      .expect(201);
+
+    const paymentId = paymentRes.body.id;
+
+    const webhookRes = await request(app.getHttpServer())
+      .post('/webhooks/payments')
+      .set('X-Webhook-Secret', 'test-webhook-secret')
+      .send({ paymentId, success: false })
+      .expect(201);
+
+    expect(webhookRes.body.status).toBe(PaymentStatus.FAILED);
+    expect(webhookRes.body.reservationId).toBeNull();
+
+    const payment = await prisma.payment.findUniqueOrThrow({
+      where: { id: paymentId },
+    });
+    expect(payment.status).toBe(PaymentStatus.FAILED);
+
+    const seat = await prisma.seat.findUniqueOrThrow({ where: { id: seatId } });
+    expect(seat.status).toBe(SeatStatus.AVAILABLE);
+    expect(await prisma.reservation.count({ where: { paymentId } })).toBe(0);
+
+    await request(app.getHttpServer())
+      .post(`/seats/${seatId}/hold`)
+      .set('Authorization', userB)
+      .expect(201);
+  });
+
+  it('delayed successful webhook completes when the hold is still valid', async () => {
+    const seatsRes = await request(app.getHttpServer())
+      .get('/seats')
+      .set('Authorization', userA)
+      .expect(200);
+
+    const seatId = seatsRes.body[0].id;
+
+    await request(app.getHttpServer())
+      .post(`/seats/${seatId}/hold`)
+      .set('Authorization', userA)
+      .expect(201);
+
+    const paymentRes = await request(app.getHttpServer())
+      .post('/payments')
+      .set('Authorization', userA)
+      .set('Idempotency-Key', 'delayed-webhook-key')
+      .send({ seatId })
+      .expect(201);
+
+    const paymentId = paymentRes.body.id;
+
+    const pendingPayment = await request(app.getHttpServer())
+      .get(`/payments/${paymentId}`)
+      .set('Authorization', userA)
+      .expect(200);
+
+    expect(pendingPayment.body.status).toBe(PaymentStatus.PENDING);
+    expect(pendingPayment.body.reservationId).toBeNull();
+
+    const webhookRes = await request(app.getHttpServer())
+      .post('/webhooks/payments')
+      .set('X-Webhook-Secret', 'test-webhook-secret')
+      .send({ paymentId, success: true })
+      .expect(201);
+
+    expect(webhookRes.body.status).toBe(PaymentStatus.COMPLETED);
+    expect(webhookRes.body.reservationId).toBeTruthy();
+
+    expect(
+      await prisma.reservation.count({ where: { paymentId } }),
+    ).toBe(1);
+  });
+
+  it('delayed successful webhook fails when the hold has expired', async () => {
+    const seatsRes = await request(app.getHttpServer())
+      .get('/seats')
+      .set('Authorization', userA)
+      .expect(200);
+
+    const seatId = seatsRes.body[0].id;
+
+    await request(app.getHttpServer())
+      .post(`/seats/${seatId}/hold`)
+      .set('Authorization', userA)
+      .expect(201);
+
+    const paymentRes = await request(app.getHttpServer())
+      .post('/payments')
+      .set('Authorization', userA)
+      .set('Idempotency-Key', 'late-webhook-key')
+      .send({ seatId })
+      .expect(201);
+
+    const paymentId = paymentRes.body.id;
+
+    await expireHold(seatId);
+
+    await request(app.getHttpServer())
+      .post('/webhooks/payments')
+      .set('X-Webhook-Secret', 'test-webhook-secret')
+      .send({ paymentId, success: true })
+      .expect(410);
+
+    const payment = await prisma.payment.findUniqueOrThrow({
+      where: { id: paymentId },
+    });
+    expect(payment.status).toBe(PaymentStatus.FAILED);
+    expect(await prisma.reservation.count({ where: { paymentId } })).toBe(0);
+
+    await request(app.getHttpServer())
+      .post(`/seats/${seatId}/hold`)
+      .set('Authorization', userB)
+      .expect(201);
   });
 });
