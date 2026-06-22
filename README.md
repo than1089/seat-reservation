@@ -1,6 +1,6 @@
 # Seat Reservation Platform
 
-A small public seat reservation app built as a take-home assessment. Three seats are available; authenticated users can hold a seat, complete a mock payment, and receive a confirmed reservation.
+A simple public seat reservation app where authenticated users can reserve one of three available seats, complete a mock payment, and receive a reservation confirmation.
 
 ## Stack
 
@@ -17,6 +17,54 @@ Browser → Clerk (sign-in) → React app
 React app → Nest API (Bearer JWT) → PostgreSQL
 Mock payment → POST /webhooks/payments → atomic reservation commit
 ```
+
+### Data model (ERD)
+
+```mermaid
+erDiagram
+    User ||--o{ Payment : makes
+    User ||--o{ Reservation : has
+    User |o--o{ Seat : "holds (optional)"
+    Seat ||--o{ Payment : receives
+    Seat ||--o| Reservation : "reserved as"
+    Payment ||--o| Reservation : confirms
+
+    User {
+        uuid id PK
+        string clerkUserId UK
+        string email UK
+        datetime createdAt
+    }
+
+    Seat {
+        uuid id PK
+        int number UK
+        int amountCents
+        SeatStatus status
+        datetime holdExpiresAt
+        uuid heldByUserId FK
+        int version
+    }
+
+    Payment {
+        uuid id PK
+        uuid userId FK
+        uuid seatId FK
+        PaymentStatus status
+        string idempotencyKey UK
+        datetime createdAt
+    }
+
+    Reservation {
+        uuid id PK
+        uuid userId FK
+        uuid seatId FK_UK
+        uuid paymentId FK_UK
+        datetime reservedAt
+    }
+```
+
+**Enums:** `SeatStatus` = `AVAILABLE` | `HELD` | `RESERVED` · `PaymentStatus` = `PENDING` | `COMPLETED` | `FAILED`
 
 ### Reliability patterns
 

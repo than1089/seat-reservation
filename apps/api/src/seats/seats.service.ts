@@ -33,7 +33,10 @@ export class SeatsService {
   }
 
   async holdSeat(seatId: string, userId: string) {
+    // Wrap read + write in one transaction so the row lock spans the full decision.
     return this.prisma.$transaction(async (tx) => {
+      // Pessimistic lock: concurrent hold attempts on this seat block here until
+      // the current transaction commits. Only one winner can read and update at a time.
       const rows = await tx.$queryRaw<LockedSeatRow[]>`
         SELECT id, number, status, "holdExpiresAt", "heldByUserId", version
         FROM "Seat"
@@ -46,6 +49,7 @@ export class SeatsService {
         throw new NotFoundException('Seat not found');
       }
 
+      // Evaluate status while the lock is held so we don't race with another hold/payment.
       const effectiveStatus = this.effectiveStatus(seat);
 
       if (effectiveStatus === SeatStatus.RESERVED) {
@@ -61,6 +65,7 @@ export class SeatsService {
 
       const holdExpiresAt = new Date(Date.now() + HOLD_DURATION_MS);
 
+      // Lock is released when the transaction commits; version tracks each state change.
       const updated = await tx.seat.update({
         where: { id: seatId },
         data: {
@@ -82,6 +87,7 @@ export class SeatsService {
 
   async releaseHold(seatId: string, userId: string) {
     return this.prisma.$transaction(async (tx) => {
+      // Same pattern as holdSeat: lock the row first, then validate and update.
       const rows = await tx.$queryRaw<LockedSeatRow[]>`
         SELECT id, number, status, "holdExpiresAt", "heldByUserId", version
         FROM "Seat"
@@ -94,6 +100,7 @@ export class SeatsService {
         throw new NotFoundException('Seat not found');
       }
 
+      // Only the current holder can release; prevents clearing someone else's hold.
       if (seat.heldByUserId !== userId) {
         throw new ConflictException('You do not hold this seat');
       }

@@ -7,6 +7,8 @@ COPY apps/api/package.json ./apps/api/
 RUN npm ci --workspace=apps/api
 
 COPY apps/api ./apps/api
+# prisma generate does not connect to the DB, but prisma.config.ts still requires DATABASE_URL.
+ENV DATABASE_URL="postgresql://postgres:postgres@postgres:5432/seat_reservation?schema=public"
 RUN npm run db:generate --workspace=apps/api && npm run build --workspace=apps/api
 
 FROM node:22-alpine AS runner

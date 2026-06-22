@@ -22,6 +22,7 @@ export class ClerkAuthGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
+    // Check if the route is public
     const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
       context.getHandler(),
       context.getClass(),
@@ -52,6 +53,7 @@ export class ClerkAuthGuard implements CanActivate {
   }
 
   private async resolveUser(token: string): Promise<User | null> {
+    // If in E2E test mode, use test tokens and skip Clerk verification
     if (
       this.configService.get<string>('E2E_TEST_MODE') === 'true' &&
       token.startsWith('test:')

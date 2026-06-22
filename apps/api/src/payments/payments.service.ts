@@ -105,6 +105,7 @@ export class PaymentsService {
     return this.completePayment(paymentId, success);
   }
 
+  // Shared by mock confirm and payment webhooks. Commits payment + seat + reservation atomically.
   private async completePayment(paymentId: string, success: boolean) {
     return this.prisma.$transaction(async (tx) => {
       const payment = await tx.payment.findUnique({
@@ -115,6 +116,7 @@ export class PaymentsService {
         throw new NotFoundException('Payment not found');
       }
 
+      // Duplicate webhook/confirm deliveries must not create a second reservation.
       if (payment.status === PaymentStatus.COMPLETED) {
         const reservation = await tx.reservation.findUnique({
           where: { paymentId },
@@ -136,6 +138,7 @@ export class PaymentsService {
         };
       }
 
+      // Pessimistic lock on the seat before any state change (same pattern as holdSeat).
       const rows = await tx.$queryRaw<LockedSeatRow[]>`
         SELECT id, number, status, "holdExpiresAt", "heldByUserId", version
         FROM "Seat"
@@ -154,6 +157,7 @@ export class PaymentsService {
           data: { status: PaymentStatus.FAILED },
         });
 
+        // Payment failed — release the hold so another user can try for this seat.
         if (
           seat.status === SeatStatus.HELD &&
           seat.heldByUserId === payment.userId
@@ -176,6 +180,7 @@ export class PaymentsService {
         };
       }
 
+      // Hold must still belong to this payer; otherwise the payment cannot succeed.
       if (
         seat.status === SeatStatus.RESERVED ||
         (seat.status === SeatStatus.HELD &&
@@ -189,6 +194,7 @@ export class PaymentsService {
         throw new GoneException('Seat hold expired or invalid');
       }
 
+      // Happy path: mark paid, reserve seat, and create the reservation in one commit.
       await tx.payment.update({
         where: { id: paymentId },
         data: { status: PaymentStatus.COMPLETED },
