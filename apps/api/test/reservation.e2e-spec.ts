@@ -16,19 +16,16 @@ describe('Reservation flow (e2e)', () => {
   const userA = 'Bearer test:user-a:alice@example.com';
   const userB = 'Bearer test:user-b:bob@example.com';
 
+  const e2eDatabaseUrl =
+    process.env.E2E_DATABASE_URL ??
+    'postgresql://postgres:postgres@localhost:5432/seat_reservation_e2e_test?schema=public';
+
   beforeAll(async () => {
     process.env.E2E_TEST_MODE = 'true';
     process.env.CLERK_SECRET_KEY = 'test-secret';
     process.env.WEBHOOK_SECRET = 'test-webhook-secret';
-    process.env.DATABASE_URL =
-      process.env.DATABASE_URL ??
-      'postgresql://postgres:postgres@localhost:5432/seat_reservation?schema=public';
+    process.env.DATABASE_URL = e2eDatabaseUrl;
 
-    execSync('npx prisma migrate deploy', {
-      cwd: join(__dirname, '..'),
-      env: process.env,
-      stdio: 'inherit',
-    });
     execSync('npx prisma db seed', {
       cwd: join(__dirname, '..'),
       env: process.env,

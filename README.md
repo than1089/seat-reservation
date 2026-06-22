@@ -183,13 +183,15 @@ curl -X POST http://localhost:3000/webhooks/payments \
 
 ## Tests
 
-Requires Postgres running (e.g. `docker compose up postgres -d`) with migrations applied.
+Requires Postgres running (e.g. `docker compose up postgres -d`).
+
+E2E tests use a **separate database** (`seat_reservation_e2e_test` by default) so they do not touch your dev data. The test runner creates the database if needed and applies migrations; each test resets state in `beforeEach` via `deleteMany`.
 
 ```bash
-# Unit tests
+# Unit tests (no database required for most tests)
 npm run test --workspace=apps/api
 
-# E2E (uses E2E_TEST_MODE with test Bearer tokens)
+# E2E (E2E_TEST_MODE + isolated DB; override with E2E_DATABASE_URL)
 npm run test:e2e
 ```
 
