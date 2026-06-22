@@ -1,0 +1,26 @@
+# Dependencies
+node_modules/
+dist/
+coverage/
+
+# Environment
+.env
+.env.local
+
+# OS / IDE
+.DS_Store
+.idea/
+.vscode/
+
+# Logs
+*.log
+
+# Prisma
+apps/api/prisma/*.db
+
+# Local Postgres data (Docker bind mount)
+.postgres-data/
+
+# Build
+apps/web/dist
+apps/api/src/generated/

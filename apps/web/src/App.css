@@ -1,0 +1,259 @@
+:root {
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  line-height: 1.5;
+  color: #0f172a;
+  background: #f1f5f9;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+}
+
+a {
+  color: inherit;
+}
+
+.app-shell {
+  min-height: 100vh;
+}
+
+.app-header {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  padding: 1rem 2rem;
+  background: #0f172a;
+  color: white;
+}
+
+.app-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-right: auto;
+}
+
+.nav-link {
+  padding: 0.5rem 0.75rem;
+  border-radius: 8px;
+  text-decoration: none;
+  color: #cbd5e1;
+  font-weight: 600;
+  font-size: 0.9375rem;
+}
+
+.nav-link:hover {
+  color: white;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.nav-link.active {
+  color: white;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.brand {
+  font-weight: 700;
+  font-size: 1.125rem;
+  text-decoration: none;
+}
+
+.app-main {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem 4rem;
+}
+
+.center-page {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 2rem;
+}
+
+.page-header h1 {
+  margin: 0 0 0.5rem;
+}
+
+.page-header p,
+.muted {
+  color: #64748b;
+}
+
+.seat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+.seat-card {
+  background: white;
+  border-radius: 16px;
+  padding: 1.5rem;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.seat-number {
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.badge {
+  display: inline-block;
+  width: fit-content;
+  padding: 0.25rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.badge.available {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.badge.held {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.badge.held-mine {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.badge.reserved {
+  background: #e2e8f0;
+  color: #475569;
+}
+
+.btn {
+  border: none;
+  border-radius: 10px;
+  padding: 0.75rem 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  text-align: center;
+}
+
+.btn.primary {
+  background: #2563eb;
+  color: white;
+}
+
+.btn.secondary {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+.btn.ghost {
+  background: transparent;
+  color: #64748b;
+}
+
+.btn.wide {
+  width: 100%;
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.checkout-card,
+.confirmation {
+  background: white;
+  border-radius: 16px;
+  padding: 2rem;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+}
+
+.checkout-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.checkout-card {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  max-width: 480px;
+}
+
+.error {
+  color: #dc2626;
+}
+
+.warn {
+  color: #dc2626;
+}
+
+.confirmation {
+  text-align: center;
+  max-width: 520px;
+  margin: 0 auto;
+}
+
+.confirmation-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+}
+
+.success-icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: #dcfce7;
+  color: #166534;
+  display: grid;
+  place-items: center;
+  font-size: 2rem;
+  margin: 0 auto 1rem;
+}
+
+.empty-state {
+  margin-top: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.reservation-list {
+  list-style: none;
+  margin: 1.5rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.reservation-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  background: white;
+  border-radius: 16px;
+  padding: 1.25rem 1.5rem;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+}
+
+.reservation-item p {
+  margin: 0.25rem 0 0;
+}

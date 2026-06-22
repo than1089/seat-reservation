@@ -1,0 +1,41 @@
+# Dependencies (reinstalled in Docker via npm ci)
+node_modules/
+**/node_modules/
+
+# Build outputs
+dist/
+**/dist/
+coverage/
+**/.tmp/
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+
+# Local database data
+.postgres-data/
+
+# Git and editor
+.git/
+.gitignore
+.github/
+.idea/
+.vscode/
+.DS_Store
+
+# Logs
+*.log
+npm-debug.log*
+
+# Docs (not needed in images)
+**/*.md
+
+# API: tests and local dev artifacts
+apps/api/test/
+apps/api/**/*.spec.ts
+apps/api/coverage/
+apps/api/prisma/*.db
+
+# Web: local dev artifacts
+apps/web/coverage/

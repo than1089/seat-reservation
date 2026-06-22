@@ -1,0 +1,75 @@
+generator client {
+  provider            = "prisma-client"
+  output              = "../src/generated/prisma"
+  importFileExtension = ""
+  moduleFormat        = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum SeatStatus {
+  AVAILABLE
+  HELD
+  RESERVED
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+}
+
+model User {
+  id          String        @id @default(uuid())
+  clerkUserId String        @unique
+  email       String        @unique
+  createdAt   DateTime      @default(now())
+  payments    Payment[]
+  reservations Reservation[]
+  heldSeats   Seat[]        @relation("SeatHolder")
+}
+
+model Seat {
+  id             String     @id @default(uuid())
+  number         Int        @unique
+  amountCents    Int        @default(2500)
+  status         SeatStatus @default(AVAILABLE)
+  holdExpiresAt  DateTime?
+  heldByUserId   String?
+  version        Int        @default(0)
+  heldBy         User?      @relation("SeatHolder", fields: [heldByUserId], references: [id])
+  payments       Payment[]
+  reservation    Reservation?
+
+  @@index([status])
+}
+
+model Payment {
+  id             String        @id @default(uuid())
+  userId         String
+  seatId         String
+  status         PaymentStatus @default(PENDING)
+  idempotencyKey String        @unique
+  createdAt      DateTime      @default(now())
+  user           User          @relation(fields: [userId], references: [id])
+  seat           Seat          @relation(fields: [seatId], references: [id])
+  reservation    Reservation?
+
+  @@index([userId])
+  @@index([seatId])
+}
+
+model Reservation {
+  id         String   @id @default(uuid())
+  userId     String
+  seatId     String   @unique
+  paymentId  String   @unique
+  reservedAt DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id])
+  seat       Seat     @relation(fields: [seatId], references: [id])
+  payment    Payment  @relation(fields: [paymentId], references: [id])
+
+  @@index([userId])
+}
